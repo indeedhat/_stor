@@ -1,3 +1,4 @@
+# github.com/indeedhat/automux
 session = "dotStor"
 # config = "./tmux.conf"
 # single_session = false 
