@@ -59,6 +59,10 @@ var (
 	}
 )
 
+var (
+	ErrNotStoreRepo = errors.New("Not inside a .stor repo")
+)
+
 func main() {
 	var err error
 	pwd, err = os.Getwd()
@@ -67,6 +71,7 @@ func main() {
 	}
 
 	rootCmd.AddCommand(
+		initCmd,
 		trackCmd,
 		releaseCmd,
 		manCmd,
@@ -77,8 +82,31 @@ func main() {
 	}
 }
 
+// initStor marks the current directory as a .stor repo
+func initStor(cmd *cobra.Command, args []string) error {
+	if isStorRepo() {
+		return errors.New("Current directory is already a .stor repo")
+	}
+
+	if _, err := storRoot(); err != nil && !errors.Is(err, ErrNotStoreRepo) {
+		return errors.New("Cannot create a .stor repo inside another .stor repo")
+	}
+
+	if err := os.WriteFile(filepath.Join(pwd, ".stor"), nil, 0644); err != nil {
+		return errors.New(
+			"Failed to setup a new .stor repo\nPerhaps you don't have write permissions for the current directiory",
+		)
+	}
+
+	return nil
+}
+
 // track... tracks a directory in the .stor
 func track(cmd *cobra.Command, args []string) error {
+	if !isStorRepo() {
+		return errors.New("Current directory is not a .stor repo")
+	}
+
 	var (
 		dst string
 		tgt = args[0]
@@ -114,27 +142,51 @@ func track(cmd *cobra.Command, args []string) error {
 		return errors.New("Failed to create symlink to target, move has been reverted")
 	}
 
+	if err := db.Store(tgt, dst); err != nil {
+		if err := os.Remove(tgt); err != nil {
+			return errors.New("Failed to save link pair to the database, filesystem changes could not be reverted")
+		}
+		if err := os.Rename(tgt, dst); err != nil {
+			return errors.New("Failed to save link pair to the database, move could not be reverted")
+		}
+		return errors.New("Failed to save link pair to the database, changes have been reverted")
+	}
+
 	return nil
 }
 
+// release the target pair from the .stor repo reverting changes back to system stock
 func release(cmd *cobra.Command, args []string) error {
-	return nil
-}
-
-// initStor marks the current directory as a .stor repo
-func initStor(cmd *cobra.Command, args []string) error {
-	if isStorRepo() {
-		return errors.New("Current directory is already a .stor repo")
+	if !isStorRepo() {
+		return errors.New("Current directory is not a .stor repo")
 	}
 
-	if _, err := storRoot(); err != nil {
-		return errors.New("Cannot create a .stor repo inside another .stor repo")
+	symlink, target, err := db.Find(args[0])
+	if err != nil {
+		return err
 	}
 
-	if err := os.WriteFile(filepath.Join(pwd, ".stor"), nil, 0644); err != nil {
-		return errors.New(
-			"Failed to setup a new .stor repo\nPerhaps you don't have write permissions for the current directiory",
-		)
+	if err := os.Remove(symlink); err != nil {
+		return errors.New("Failed to remove symlink, operation aborted")
+	}
+
+	if err := os.Rename(target, symlink); err != nil {
+		if err := os.Symlink(target, symlink); err != nil {
+			return errors.New("Failed to move files, Failed to recreate symlink")
+		}
+
+		return errors.New("Failed to move files, changes have been reverted")
+	}
+
+	if err := db.Remove(symlink); err != nil {
+		if err := os.Rename(symlink, target); err != nil {
+			return errors.New("Failed to remove entry from database")
+		}
+		if err := os.Symlink(target, symlink); err != nil {
+			return errors.New("Failed to remove entry from database, Failed to recreate symlink")
+		}
+
+		return errors.New("Failed to remove entry from database, changes have been reverted")
 	}
 
 	return nil
@@ -145,7 +197,7 @@ func storRoot() (string, error) {
 	dir := pwd
 
 	for len(dir) > 1 {
-		stat, err := os.Stat(filepath.Join(dir, ".stor"))
+		stat, err := os.Stat(dbPath(dir))
 		if err == nil && !stat.IsDir() {
 			return dir, nil
 		}
@@ -153,7 +205,7 @@ func storRoot() (string, error) {
 		dir = filepath.Dir(dir)
 	}
 
-	return "", errors.New("Not inside a .stor repo")
+	return "", ErrNotStoreRepo
 }
 
 // isStorRepo checks if the current working directory is a .stor repo
@@ -170,7 +222,7 @@ func isStorRepo() bool {
 // are a symlink
 func hasSymlinkParent(path string) (string, bool) {
 	for len(path) > 1 {
-		stat, err := os.Lstat(filepath.Join(path, ".stor"))
+		stat, err := os.Lstat(dbPath(path))
 		if err == nil && stat.Mode()&os.ModeSymlink == os.ModeSymlink {
 			return path, true
 		}

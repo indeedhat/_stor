@@ -1,22 +1,34 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
-	"encoding/csv"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
-	"unicode"
 )
 
-const seperator = " => "
+const seperator = "=>"
 
-func dbStor(symlink, target string) error {
-	fh, err := os.OpenFile(filepath.Join(pwd, ".stor"), os.O_WRONLY|os.O_APPEND, 0644)
+type DB struct{}
+
+var db = DB{}
+
+// Store a link pair in the database
+func (d DB) Store(symlink, target string) error {
+	fh, err := os.OpenFile(dbPath(), os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
 		return err
+	}
+
+	if _, _, err := d.Find(symlink); err == nil {
+		return errors.New("Symlink exists in the database")
+	}
+	if _, _, err := d.Find(target); err == nil {
+		return errors.New("Target exists in the database")
 	}
 
 	symlink = strconv.Quote(symlink)
@@ -26,70 +38,100 @@ func dbStor(symlink, target string) error {
 	return err
 }
 
-func dbFind(path string) (string, string, error) {
-	r := csv.NewReader()
+func (d DB) Find(path string) (string, string, error) {
+	lines, err := d.read()
+	if err != nil {
+		return "", "", err
+	}
+
+	for _, line := range lines {
+		if len(line) == 1 {
+			continue
+		}
+
+		if line[0] == path || line[1] == path {
+			return line[0], line[1], nil
+		}
+	}
+
+	return "", "", errors.New("path not found")
 }
 
-func quoteString(field string) (string, error) {
+func (d DB) Remove(symlink string) error {
 	var (
-		buf bytes.Buffer
-		err error
+		buf   bytes.Buffer
+		found bool
 	)
 
-	if err := buf.WriteByte('"'); err != nil {
-		return "", err
+	lines, err := d.read()
+	if err != nil {
+		return err
 	}
 
-	for len(field) > 0 {
-		i := strings.IndexAny(field, "\"\r\n")
-		if i < 0 {
-			i = len(field)
+	for _, line := range lines {
+		if len(line) == 1 {
+			buf.WriteString(line[0] + "\n")
+			continue
 		}
 
-		if _, err := buf.WriteString(field[:i]); err != nil {
-			return "", err
+		if line[0] == symlink {
+			found = true
+			continue
 		}
-		field = field[i:]
 
-		if len(field) > 0 {
-			switch field[0] {
-			case '"':
-				_, err = buf.WriteString(`\"`)
-			case '\r' | '\n':
-				err = buf.WriteByte(field[0])
-			}
+		symlink := strconv.Quote(line[0])
+		target := strconv.Quote(line[1])
 
-			field = field[1:]
-			if err != nil {
-				return "", err
-			}
-		}
+		buf.WriteString(fmt.Sprintf("%s%s%s", symlink, seperator, target))
 	}
 
-	if err := buf.WriteByte('"'); err != nil {
-		return "", err
+	if !found {
+		return errors.New("symlink not found")
 	}
 
-	return buf.String(), nil
+	return os.WriteFile(dbPath(), buf.Bytes(), 0644)
 }
 
-func stringNeedsQuotes(field string) bool {
-	if field == "" {
-		return false
+// read the db file into an appropriate data structure
+func (DB) read() ([][]string, error) {
+	data, err := os.ReadFile(dbPath())
+	if err != nil {
+		return nil, errors.New("could not read .stor db")
 	}
 
-	if field == `\.` {
-		return true
+	var (
+		i       int
+		db      [][]string
+		scanner = bufio.NewScanner(bytes.NewReader(data))
+	)
+
+	for scanner.Scan() {
+		i++
+		line := scanner.Text()
+		if line == "" || line[0] == '#' {
+			db = append(db, []string{line})
+			continue
+		}
+
+		parts := strings.Split(line, seperator)
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("invalid line in db: %d", i)
+		}
+
+		db = append(db, []string{readDbPart(parts[0]), readDbPart(parts[1])})
 	}
 
-	if strings.Contains(field, seperator) {
-		return true
-	}
-	if strings.Contains(field, `"`) {
-		return true
-	}
+	return db, nil
+}
 
-	runes := []rune(field)
+func dbPath(altPwd ...string) string {
+	if len(altPwd) == 0 {
+		altPwd = append(altPwd, pwd)
+	}
+	return filepath.Join(altPwd[0], ".stor")
+}
 
-	return unicode.IsSpace(runes[0]) || unicode.IsSpace(runes[len(runes)-1])
+func readDbPart(in string) string {
+	out, _ := strconv.Unquote(strings.Trim(in, " \r\n\t"))
+	return out
 }
