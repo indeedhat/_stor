@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"os"
 )
 
@@ -56,6 +55,8 @@ func (e *ReportErr) Error() string {
 var _ error = (*ReportErr)(nil)
 
 type OpsPipeline struct {
+	DryRun bool
+
 	operations   []Operation
 	failIdx      int
 	revertReport []error
@@ -69,6 +70,11 @@ func newPipeline(ops ...Operation) *OpsPipeline {
 
 func (p *OpsPipeline) Apply() error {
 	for i, op := range p.operations {
+		if p.DryRun {
+			fmt.Println(op.Diagram)
+			continue
+		}
+
 		if err := op.Apply(); err != nil {
 			p.failIdx = i
 			return err
@@ -154,23 +160,5 @@ func removeFromDbOp(symlink, local string) Operation {
 		Revert: func() error {
 			return db.Store(symlink, local)
 		},
-	}
-}
-
-func sudo() {
-	pipe := NewPipeline(
-		moveTagetOp(targetPath, destPath),
-		genSymlinkOp(destPath, targetPath),
-		saveToDbOp(targetPath, destPath),
-	)
-
-	if err := pipe.Apply(); err != nil {
-		report := pipe.Revert()
-
-		if err := report.Error(); err != nil {
-			log.Fatal(err)
-		}
-
-		log.Fatal("Track operation failed, all changes were reverted")
 	}
 }

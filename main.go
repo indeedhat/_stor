@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	mcobra "github.com/muesli/mango-cobra"
 	"github.com/muesli/roff"
@@ -14,6 +15,8 @@ import (
 
 var (
 	pwd string
+
+	dryRun bool
 
 	rootCmd = &cobra.Command{
 		Use:     ".stor",
@@ -77,6 +80,9 @@ func main() {
 		manCmd,
 	)
 
+	trackCmd.Flags().BoolVarP(&dryRun, "dry-run", "d", false, "Print commands rather than running them")
+	releaseCmd.Flags().BoolVarP(&dryRun, "dry-run", "d", false, "Print commands rather than running them")
+
 	if err := rootCmd.Execute(); err != nil {
 		log.Fatal(err)
 	}
@@ -107,10 +113,12 @@ func track(cmd *cobra.Command, args []string) error {
 		return errors.New("Current directory is not a .stor repo")
 	}
 
-	var (
-		dst string
-		tgt = args[0]
-	)
+	var dst string
+
+	tgt, err := filepath.Abs(args[0])
+	if err != nil {
+		return err
+	}
 
 	if len(args) == 2 {
 		dst = filepath.Join(pwd, args[1])
@@ -131,18 +139,18 @@ func track(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("Destination '%s' already exists please provide an alternative destination path", dst)
 	}
 
-	if err := os.Rename(tgt, dst); err != nil {
-		return errors.New("Failed to copy target location to .stor repo")
-	}
-
-	p := newPipeline(moveTargetOp(tgt, dst), genSymlinkOp(dst, tgt), saveToDb(tgt, dst))
+	p := newPipeline(
+		moveTargetOp(tgt, dst),
+		genSymlinkOp(dst, tgt),
+		saveToDb(tgt, strings.TrimPrefix(dst, pwd+"/")),
+	)
+	p.DryRun = dryRun
 	if err := p.Apply(); err != nil {
-		if err := p.Revert(); err != nil {
-			log.Fatal(err)
+		if rerr := p.Revert(); rerr != nil {
+			return fmt.Errorf("%s: %w", err, rerr)
 		}
 
-		log.Fatal("Track operation failed, all changes were reverted")
-		return err
+		return fmt.Errorf("%s: Track operation failed, all changes were reverted", err)
 	}
 
 	return nil
@@ -159,18 +167,14 @@ func release(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if err := os.Remove(symlink); err != nil {
-		return errors.New("Failed to remove symlink, operation aborted")
-	}
-
 	p := newPipeline(removeSymlinkOp(target, symlink), moveTargetOp(target, symlink), removeFromDbOp(symlink, target))
+	p.DryRun = dryRun
 	if err := p.Apply(); err != nil {
-		if err := p.Revert(); err != nil {
-			log.Fatal(err)
+		if rerr := p.Revert(); rerr != nil {
+			return fmt.Errorf("%s: %w", err, rerr)
 		}
 
-		log.Fatal("Release operation failed, all changes were reverted")
-		return err
+		return fmt.Errorf("%s: Release operation failed, all changes were reverted", err)
 	}
 
 	return nil
