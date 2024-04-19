@@ -135,21 +135,14 @@ func track(cmd *cobra.Command, args []string) error {
 		return errors.New("Failed to copy target location to .stor repo")
 	}
 
-	if err := os.Symlink(dst, tgt); err != nil {
-		if err := os.Rename(tgt, dst); err != nil {
-			return errors.New("Failed to create symlink to target, move could not be reverted")
+	p := newPipeline(moveTargetOp(tgt, dst), genSymlinkOp(dst, tgt), saveToDb(tgt, dst))
+	if err := p.Apply(); err != nil {
+		if err := p.Revert(); err != nil {
+			log.Fatal(err)
 		}
-		return errors.New("Failed to create symlink to target, move has been reverted")
-	}
 
-	if err := db.Store(tgt, dst); err != nil {
-		if err := os.Remove(tgt); err != nil {
-			return errors.New("Failed to save link pair to the database, filesystem changes could not be reverted")
-		}
-		if err := os.Rename(tgt, dst); err != nil {
-			return errors.New("Failed to save link pair to the database, move could not be reverted")
-		}
-		return errors.New("Failed to save link pair to the database, changes have been reverted")
+		log.Fatal("Track operation failed, all changes were reverted")
+		return err
 	}
 
 	return nil
@@ -170,23 +163,14 @@ func release(cmd *cobra.Command, args []string) error {
 		return errors.New("Failed to remove symlink, operation aborted")
 	}
 
-	if err := os.Rename(target, symlink); err != nil {
-		if err := os.Symlink(target, symlink); err != nil {
-			return errors.New("Failed to move files, Failed to recreate symlink")
+	p := newPipeline(removeSymlinkOp(target, symlink), moveTargetOp(target, symlink), removeFromDbOp(symlink, target))
+	if err := p.Apply(); err != nil {
+		if err := p.Revert(); err != nil {
+			log.Fatal(err)
 		}
 
-		return errors.New("Failed to move files, changes have been reverted")
-	}
-
-	if err := db.Remove(symlink); err != nil {
-		if err := os.Rename(symlink, target); err != nil {
-			return errors.New("Failed to remove entry from database")
-		}
-		if err := os.Symlink(target, symlink); err != nil {
-			return errors.New("Failed to remove entry from database, Failed to recreate symlink")
-		}
-
-		return errors.New("Failed to remove entry from database, changes have been reverted")
+		log.Fatal("Release operation failed, all changes were reverted")
+		return err
 	}
 
 	return nil
