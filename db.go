@@ -18,7 +18,7 @@ type DB struct{}
 var db = DB{}
 
 // Store a link pair in the database
-func (d DB) Store(symlink, target string) error {
+func (d DB) Store(target, symlink string) error {
 	fh, err := os.OpenFile(dbPath(), os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
 		return err
@@ -34,7 +34,7 @@ func (d DB) Store(symlink, target string) error {
 	symlink = strconv.Quote(symlink)
 	target = strconv.Quote(target)
 
-	_, err = fh.WriteString(fmt.Sprintf("%s%s%s", symlink, seperator, target))
+	_, err = fh.WriteString(fmt.Sprintf("%s %s %s\n", symlink, seperator, target))
 	return err
 }
 
@@ -74,15 +74,15 @@ func (d DB) Remove(symlink string) error {
 			continue
 		}
 
-		if line[0] == symlink {
+		if line[1] == symlink {
 			found = true
 			continue
 		}
 
-		symlink := strconv.Quote(line[0])
-		target := strconv.Quote(line[1])
+		target := strconv.Quote(line[0])
+		symlink := strconv.Quote(line[1])
 
-		buf.WriteString(fmt.Sprintf("%s%s%s", symlink, seperator, target))
+		buf.WriteString(fmt.Sprintf("%s %s %s\n", target, seperator, symlink))
 	}
 
 	if !found {

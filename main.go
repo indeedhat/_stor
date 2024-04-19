@@ -162,7 +162,7 @@ func release(cmd *cobra.Command, args []string) error {
 		return errors.New("Current directory is not a .stor repo")
 	}
 
-	symlink, target, err := db.Find(args[0])
+	target, symlink, err := db.Find(args[0])
 	if err != nil {
 		return err
 	}
