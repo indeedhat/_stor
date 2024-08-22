@@ -19,7 +19,7 @@ var (
 	dryRun bool
 
 	rootCmd = &cobra.Command{
-		Use:     ".stor",
+		Use:     "_stor",
 		Short:   "Manage your dot files",
 		Args:    cobra.NoArgs,
 		Version: "0.0.1",
@@ -29,7 +29,7 @@ var (
 	}
 	initCmd = &cobra.Command{
 		Use:   "init",
-		Short: "Initialize a new .stor repo here",
+		Short: "Initialize a new _stor repo here",
 		Args:  cobra.NoArgs,
 		RunE:  initStor,
 	}
@@ -63,7 +63,7 @@ var (
 )
 
 var (
-	ErrNotStoreRepo = errors.New("Not inside a .stor repo")
+	ErrNotStoreRepo = errors.New("Not inside a _stor repo")
 )
 
 func main() {
@@ -88,19 +88,19 @@ func main() {
 	}
 }
 
-// initStor marks the current directory as a .stor repo
+// initStor marks the current directory as a _stor repo
 func initStor(cmd *cobra.Command, args []string) error {
 	if isStorRepo() {
-		return errors.New("Current directory is already a .stor repo")
+		return errors.New("Current directory is already a _stor repo")
 	}
 
 	if _, err := storRoot(); err != nil && !errors.Is(err, ErrNotStoreRepo) {
-		return errors.New("Cannot create a .stor repo inside another .stor repo")
+		return errors.New("Cannot create a _stor repo inside another _stor repo")
 	}
 
 	if err := os.WriteFile(filepath.Join(pwd, ".stor"), nil, 0644); err != nil {
 		return errors.New(
-			"Failed to setup a new .stor repo\nPerhaps you don't have write permissions for the current directiory",
+			"Failed to setup a new _stor repo\nPerhaps you don't have write permissions for the current directiory",
 		)
 	}
 
@@ -110,7 +110,7 @@ func initStor(cmd *cobra.Command, args []string) error {
 // track... tracks a directory in the .stor
 func track(cmd *cobra.Command, args []string) error {
 	if !isStorRepo() {
-		return errors.New("Current directory is not a .stor repo")
+		return errors.New("Current directory is not a _stor repo")
 	}
 
 	var dst string
@@ -129,10 +129,10 @@ func track(cmd *cobra.Command, args []string) error {
 	parentPath, isSymlink := hasSymlinkParent(tgt)
 	if isSymlink {
 		if parentPath == tgt {
-			return errors.New("Cannot track a symlink in .stor")
+			return errors.New("Cannot track a symlink in _stor")
 		}
 
-		return fmt.Errorf("Cannot target the child of symlink '%s' in .stor", parentPath)
+		return fmt.Errorf("Cannot target the child of symlink '%s' in _stor", parentPath)
 	}
 
 	if _, err := os.Stat(dst); err == nil {
@@ -156,10 +156,10 @@ func track(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// release the target pair from the .stor repo reverting changes back to system stock
+// release the target pair from the _stor repo reverting changes back to system stock
 func release(cmd *cobra.Command, args []string) error {
 	if !isStorRepo() {
-		return errors.New("Current directory is not a .stor repo")
+		return errors.New("Current directory is not a _stor repo")
 	}
 
 	target, symlink, err := db.Find(args[0])
@@ -180,7 +180,7 @@ func release(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// storRoot finds the closest parent that is marked as a .stor repo
+// storRoot finds the closest parent that is marked as a _stor repo
 func storRoot() (string, error) {
 	dir := pwd
 
@@ -196,7 +196,7 @@ func storRoot() (string, error) {
 	return "", ErrNotStoreRepo
 }
 
-// isStorRepo checks if the current working directory is a .stor repo
+// isStorRepo checks if the current working directory is a _stor repo
 func isStorRepo() bool {
 	path, err := storRoot()
 	if err != nil {

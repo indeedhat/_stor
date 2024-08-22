@@ -1,4 +1,4 @@
-module github.com/indeedhat/.stor
+module github.com/indeedhat/_stor
 
 go 1.22.2
 

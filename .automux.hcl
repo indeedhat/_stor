@@ -1,18 +1,9 @@
 # github.com/indeedhat/automux
-session = "dotStor"
-# config = "./tmux.conf"
-# single_session = false 
+session = "under-store"
 
 window "Editor" {
     exec = "vim"
     focus = true
-
-    # split {
-    #     vertical = true
-    #     exec = "cmd_to_run_in_split"
-    #     size = 30
-    #     vertical = true
-    # }
 }
 
 window "Shell" {

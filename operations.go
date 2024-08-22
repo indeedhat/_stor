@@ -100,7 +100,7 @@ func (p *OpsPipeline) Revert() error {
 
 func moveTargetOp(src, dst string) Operation {
 	return Operation{
-		Name:    "Move target to .stor directory",
+		Name:    "Move target to _stor directory",
 		Diagram: fmt.Sprintf("cp %s %s", src, dst),
 		Apply: func() error {
 			return os.Rename(src, dst)
@@ -113,7 +113,7 @@ func moveTargetOp(src, dst string) Operation {
 
 func genSymlinkOp(src, dst string) Operation {
 	return Operation{
-		Name:    "Symlink files in .stor to original location",
+		Name:    "Symlink files in _stor to original location",
 		Diagram: fmt.Sprintf("ln -s %s %s", dst, src),
 		Apply: func() error {
 			return os.Symlink(src, dst)
@@ -139,8 +139,8 @@ func removeSymlinkOp(src, dst string) Operation {
 
 func saveToDb(symlink, local string) Operation {
 	return Operation{
-		Name:    "Save the path pair to the .stor database",
-		Diagram: fmt.Sprintf(".stor save %s => %s", symlink, local),
+		Name:    "Save the path pair to the _stor database",
+		Diagram: fmt.Sprintf("_stor save %s => %s", symlink, local),
 		Apply: func() error {
 			return db.Store(symlink, local)
 		},
@@ -152,8 +152,8 @@ func saveToDb(symlink, local string) Operation {
 
 func removeFromDbOp(symlink, local string) Operation {
 	return Operation{
-		Name:    "Save the path pair to the .stor database",
-		Diagram: fmt.Sprintf(".stor delete %s => %s", symlink, local),
+		Name:    "Save the path pair to the _stor database",
+		Diagram: fmt.Sprintf("_stor delete %s => %s", symlink, local),
 		Apply: func() error {
 			return db.Remove(symlink)
 		},

@@ -96,7 +96,7 @@ func (d DB) Remove(symlink string) error {
 func (DB) read() ([][]string, error) {
 	data, err := os.ReadFile(dbPath())
 	if err != nil {
-		return nil, errors.New("could not read .stor db")
+		return nil, errors.New("could not read _stor db")
 	}
 
 	var (

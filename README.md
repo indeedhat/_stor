@@ -1,9 +1,9 @@
-# Indeedhat .stor
+# Indeedhat _stor (understore)
 Like GNU Stow but dumber
 
 ## Install
 ```console
-go install github.com/indeedhat/.stor@latest
+go install github.com/indeedhat/_stor@latest
 ```
 
 ## Usage
@@ -11,19 +11,19 @@ go install github.com/indeedhat/.stor@latest
 Manage your dot files
 
 Usage:
-  .stor [flags]
-  .stor [command]
+  _stor [flags]
+  _stor [command]
 
 Available Commands:
   completion  Generate the autocompletion script for the specified shell
   help        Help about any command
-  init        Initialize a new .stor repo here
+  init        Initialize a new _stor repo here
   release     Manage your dot files
   track       Manage your dot files
 
 Flags:
-  -h, --help      help for .stor
-  -v, --version   version for .stor
+  -h, --help      help for _stor
+  -v, --version   version for _stor
 
-Use ".stor [command] --help" for more information about a command.
+Use "_stor [command] --help" for more information about a command.
 ```
