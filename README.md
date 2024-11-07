@@ -15,11 +15,12 @@ Usage:
   _stor [command]
 
 Available Commands:
+  apply       Apply the current _store repo to your system
   completion  Generate the autocompletion script for the specified shell
   help        Help about any command
   init        Initialize a new _stor repo here
-  release     Manage your dot files
-  track       Manage your dot files
+  release     Stop tracking a path in the _stor repo returning the file(s) to their original location(s)
+  track       Track a new path in the _stor repo
 
 Flags:
   -h, --help      help for _stor
